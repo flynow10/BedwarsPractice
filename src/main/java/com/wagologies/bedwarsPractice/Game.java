@@ -28,7 +28,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-public class Game implements Listener {
+public class Game extends com.wagologies.HubPlugin.Game implements Listener {
     public List<BedwarsTeam> teams = new ArrayList<>();
     public Material[] breakables = new Material[] {
             Material.WOOL,
@@ -45,7 +45,6 @@ public class Game implements Listener {
             Material.DIAMOND_SWORD
     };
     public boolean gameRunning;
-    public World world;
     public ConfigReader configReader;
     public Location deathLocation;
     public List<Generator> emeraldGenerators = new ArrayList<>();
@@ -53,6 +52,7 @@ public class Game implements Listener {
 
     public Game(List<List<Player>> teams, World world)
     {
+        super(teams, world);
         gameRunning = true;
         this.world = world;
         deathLocation = new Location(world, 0.5,120, 0.5);
@@ -64,6 +64,34 @@ public class Game implements Listener {
         LoadChunks();
         new SpecialItems();
     }
+
+    @Override
+    public void StopGame(boolean b) {
+        for(BedwarsTeam team : teams)
+        {
+            team.OnEndGame();
+        }
+        for (Generator emeraldGenerator : emeraldGenerators) {
+            emeraldGenerator.StopSpawner();
+        }
+        for (Generator diamondGenerator : diamondGenerators) {
+            diamondGenerator.StopSpawner();
+        }
+        gameRunning = false;
+        Bukkit.getScheduler().scheduleSyncDelayedTask(BedwarsPractice.instance, this::EndGame, 100L);
+        SpecialItems.Stop();
+        for(Player player : GetAllPlayers())
+        {
+            GetBedwarsPlayerFromPlayer(player).OnGameEnd();
+        }
+        HandlerList.unregisterAll(this);
+        GetAllPlayers().forEach(HubPlugin::TeleportToHub);
+        if(b) {
+            Bukkit.unloadWorld("bedwars", false);
+        }
+        BedwarsPractice.instance.game = null;
+    }
+
     public BedwarsPlayer GetBedwarsPlayerFromPlayer(Player player)
     {
         for(BedwarsTeam team : teams)
@@ -131,9 +159,7 @@ public class Game implements Listener {
             GetBedwarsPlayerFromPlayer(player).OnGameEnd();
         }
         HandlerList.unregisterAll(this);
-        GetAllPlayers().forEach(player -> {
-            HubPlugin.TeleportToHub(player);
-        });
+        GetAllPlayers().forEach(HubPlugin::TeleportToHub);
         Bukkit.unloadWorld("bedwars", false);
         BedwarsPractice.instance.game = null;
     }
@@ -200,8 +226,8 @@ public class Game implements Listener {
         if(gameRunning) {
             BedwarsPlayer bedwarsPlayer = GetBedwarsPlayerFromPlayer(event.getPlayer());
             if (bedwarsPlayer != null) {
-                if (!Arrays.stream(breakables).anyMatch(event.getBlock().getType()::equals)) {
-                    if (event.isCancelled() != true) {
+                if (Arrays.stream(breakables).noneMatch(event.getBlock().getType()::equals)) {
+                    if (!event.isCancelled()) {
                         event.setCancelled(true);
                     }
                 }
@@ -236,11 +262,11 @@ public class Game implements Listener {
         }
     }
     public static Location getBed(Location l) {
-        return checkForMaterial(l, Material.BED_BLOCK);
+        return getOtherBedLocation(l);
     }
-    private static Location checkForMaterial(Location l, Material mat) {
+    private static Location getOtherBedLocation(Location l) {
         Location returnV = null;
-        List<Location> locs = new ArrayList<Location>();
+        List<Location> locs = new ArrayList<>();
         locs.add(new Location(l.getWorld(), l.getX() + 1, l.getY(), l.getZ()));
         locs.add(new Location(l.getWorld(), l.getX(), l.getY(), l.getZ() + 1));
         locs.add(new Location(l.getWorld(), l.getX() + 1, l.getY(), l.getZ() + 1));
@@ -267,7 +293,7 @@ public class Game implements Listener {
         locs.add(new Location(l.getWorld(), l.getX() - 1, l.getY() - 1, l.getZ() + 1));
         for(Location ll : locs) {
             Block b = ll.getBlock();
-            if(b.getType() == mat) {
+            if(b.getType() == Material.BED_BLOCK) {
                 returnV = ll;
                 break;
             }
@@ -283,10 +309,8 @@ public class Game implements Listener {
             BedwarsPlayer bedwarsPlayer = GetBedwarsPlayerFromPlayer(eventPlayer);
             if(bedwarsPlayer != null)
             {
-                if(event.isCancelled() != true)
-                {
+                if(!event.isCancelled())
                     event.setCancelled(true);
-                }
             }
         }
     }
@@ -319,7 +343,7 @@ public class Game implements Listener {
     {
         String message;
         String playerName = ChatColor.YELLOW + player.player.getDisplayName();
-        Boolean hasAttacker = player.attacker != null;
+        boolean hasAttacker = player.attacker != null;
         String attackerName = "";
         if(hasAttacker)
             attackerName = ChatColor.YELLOW + player.attacker.player.getDisplayName();
