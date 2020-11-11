@@ -1,0 +1,12 @@
+name: BedwarsPractice
+main: com.wagologies.bedwarsPractice.BedwarsPractice
+version: 1.0
+depend: [ProtocolLib, HubPlugin, HolographicDisplays]
+commands:
+  bedwars:
+    usage: /bedwars <player>
+    description: Start a practice game of bedwars with someone
+  specialItems:
+     usage: /specialItems (on|off)
+     description: Toggles special items
+     permission: bedwarsPractice.specials
